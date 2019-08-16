@@ -23,7 +23,6 @@ library (xgboost)
 
 myDummyDataM <- xgb.DMatrix(data = as.matrix(myDummyData[,c("var1", "var2", "var3")])
                             , label = as.matrix(myDummyData[,c("target")]))
-dim(myDummyDataM)
 
 params <- list(booster = "gbtree"
                , objective = "reg:linear"
@@ -34,7 +33,7 @@ params <- list(booster = "gbtree"
                , subsample=1
                , colsample_bytree=1)
 
-xgbcv <- xgb.cv(params = params
+xgb <- xgb.train(params = params
                 , data = myDummyDataM
                 , nrounds = 150
                 , nfold = 10
@@ -46,10 +45,6 @@ xgbcv <- xgb.cv(params = params
                 , prediction = T
                 , metrics = "rmse")
 
-myDummyData$pred <- xgbcv$pred
-plot(myDummyData$target, myDummyData$pred)
-xgb_rmse <- sqrt(mean((myDummyData$target - myDummyData$pred)^2))
-xgb_rmse
 
 # linear regression -----------------------------
 
@@ -65,22 +60,45 @@ glmLmabda <- cv.glmnet(x = x
                        , type.measure="mse"
                        , nfolds = 10)
 
-lambda <- seq(from = glmLmabda$lambda.min, to = glmLmabda$lambda.1se, by = 0.01)
+lambda <- c(0, seq(from = glmLmabda$lambda.min, to = glmLmabda$lambda.1se, by = 0.01))
 
 myGlm <- glmnet(x = x
               , y = y
               , family="gaussian"
               , lambda = lambda)
-myGlm$beta
+
 coef(myGlm,s=mean(lambda)) 
-myDummyData$glm0 <- predict(myGlm, newx=x, s=0)
-myDummyData$glm1 <- predict(myGlm, newx=x, s=min(lambda))
-myDummyData$glm2 <- predict(myGlm, newx=x, s=mean(lambda))
-myDummyData$glm3 <- predict(myGlm, newx=x, s=max(lambda))
+
+
 
 plot(myDummyData$target, myDummyData$glm0)
-glm0_rmse <- sqrt(mean((myDummyData$target - myDummyData$glm0)^2))
-glm1_rmse <- sqrt(mean((myDummyData$target - myDummyData$glm1)^2))
-glm2_rmse <- sqrt(mean((myDummyData$target - myDummyData$glm2)^2))
-glm3_rmse <- sqrt(mean((myDummyData$target - myDummyData$glm3)^2))
-c(glm0_rmse, glm1_rmse, glm2_rmse, glm3_rmse)
+
+# EVALUATION ----------------------------------------------
+
+set.seed(200593)
+myTestData <- data.frame(var1 = rnorm(10000, 0, 4)
+                          , var2 = rpois(10000, 3)
+                          , var3 = rbinom(10000, 1, 0.2))
+myTestData$actual <- with(myTestData, sqrt(var1^2 + 3*var2)*(1+var3)) + rnorm(10000, 0, 1.5)
+
+rmse <- function(predictionColName){
+  rmse <- sqrt(mean((myTestData$actual - myTestData[,c(predictionColName)])^2))
+  rmse
+}
+
+newx <- as.matrix(myTestData[,c("var1", "var2", "var3")])
+
+myTestData$xgbPred  <- predict(xgb,   newdata = newx)
+myTestData$glm0Pred <- predict(myGlm, newx = newx, s=0)
+myTestData$glm1Pred <- predict(myGlm, newx = newx, s=glmLmabda$lambda.min)
+myTestData$glm2Pred <- predict(myGlm, newx = newx, s=mean(lambda))
+myTestData$glm3Pred <- predict(myGlm, newx = newx, s=max(lambda))
+
+
+myModels <- colnames(myTestData)[grep("Pred", colnames(myTestData))]
+
+myModelEval <- c()
+for (i in myModels){
+  myModelEval <- rbind(myModelEval, c(i, rmse(i)))
+}
+plot(c(min_rmse, myModelEval[,2], max_rmse))
