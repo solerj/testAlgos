@@ -82,49 +82,51 @@ coef(myGlm,s=c(0, glmLmabda$lambda.min, glmLmabda$lambda.1se))
 require(randomForest)
 #install.packages("ggplot2")
 library(ggplot2)
-
+#install.packages("dplyr")
+library(dplyr)
 
 set.seed(200597)
-myDummyData$cvSplit <- round(runif(10000, 0.5, 5.5))
-randFSummary <- c()
-for (i in 1:5){
-  xLoop <- myDummyData[myDummyData$cvSplit != i, featureCols]
-  yLoop <- myDummyData[myDummyData$cvSplit != i, c("target")]
-  xLoopTest <- myDummyData[myDummyData$cvSplit == i, featureCols]
-  aLoopTest <- myDummyData[myDummyData$cvSplit == i, c("target")]
-  print(i)
-  for (j in 1:ceiling(length(featureCols)/2)){
-    randF <- randomForest(x = xLoop
-                          , y = yLoop
-                          , mtry = j)
-    rmseCalc <- sqrt(mean((aLoopTest - predict(randF, newdata = xLoopTest))^2))
-    randFSummary <- rbind(randFSummary, c(i, j, rmseCalc))
-    print(j)
-    print(randFSummary)
-  }
-}
-randFSummary <- as.data.frame(randFSummary)
-colnames(randFSummary) <- c("foldNo", "mtry", "rmse")
-randFSummary$foldNo <- as.factor(randFSummary$foldNo)
-randFSummary$mtry   <- as.factor(randFSummary$mtry)
 
-
-p <- ggplot(randFSummary, aes(x=mtry, y=rmse, color=mtry)) + geom_boxplot()
-p
+# myDummyDataS <- dplyr::sample_n(myDummyData, nrow(myDummyData)/4)
+# myDummyDataS$cvSplit <- round(runif(nrow(myDummyDataS), 0.5, 5.5))
+# randFSummary <- c()
+# for (i in 1:5){
+#   xLoop <- myDummyDataS[myDummyDataS$cvSplit != i, featureCols]
+#   yLoop <- myDummyDataS[myDummyDataS$cvSplit != i, c("target")]
+#   xLoopTest <- myDummyDataS[myDummyDataS$cvSplit == i, featureCols]
+#   aLoopTest <- myDummyDataS[myDummyDataS$cvSplit == i, c("target")]
+#   print(i)
+#   for (j in 1:length(featureCols)){
+#     randF <- randomForest(x = xLoop
+#                           , y = yLoop
+#                           , mtry = j)
+#     rmseCalc <- sqrt(mean((aLoopTest - predict(randF, newdata = xLoopTest))^2))
+#     randFSummary <- rbind(randFSummary, c(i, j, rmseCalc))
+#     print(j)
+#     # print(randFSummary)
+#   }
+# }
+# randFSummary <- as.data.frame(randFSummary)
+# colnames(randFSummary) <- c("foldNo", "mtry", "rmse")
+# randFSummary$foldNo <- as.factor(randFSummary$foldNo)
+# randFSummary$mtry   <- as.factor(randFSummary$mtry)
+# 
+# 
+# p <- ggplot(randFSummary, aes(x=mtry, y=rmse, color=mtry)) + geom_boxplot()
+# p
 
 randF <- randomForest(x = xDf
                       , y = yDf
                       , ntree = 500
                       #, sampsize = 60
-                      , mtry = 4
-                      , nodesize = 5)
+                      , mtry = 5)
 
 #install.packages("rpart")
 library(rpart)
 dTree <- rpart(target ~ var1 + var2 + var3 + var4 + var5 + var6 + var7
                      , data = myDummyData
                      , method = "anova"
-                     , control = rpart.control(maxdepth = 4, cp = 0.001)
+                     , control = rpart.control(cp = 0.001)
                      )
 
 # Plot the tree.
@@ -153,7 +155,7 @@ model %>% compile(
   metrics = c("mse")
 )
 
-history <- model %>% fit(
+history <- model %>% keras::fit(
   x, y, 
   epochs = 30, batch_size = 128, 
   validation_split = 0.2
